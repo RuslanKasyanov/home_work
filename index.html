@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        #fieldBoll {
+            border: 10px black solid;
+        }
+    </style>
+</head>
+<body>
+<canvas id="fieldBoll"></canvas>
+</body>
+<script>
+    (function (){
+        'use strict';
+        var canvas = document.getElementById('fieldBoll'),
+                ctx = canvas.getContext('2d'),
+                ballArray =[],
+                moveBall,
+                colorPicker ={
+                    it:-1,
+                    color:[
+                            'red','black','grey','green','yellow','violet'
+                    ],
+                    getColor: function (){
+                        colorPicker.it+=1;
+                       if(colorPicker.it >= colorPicker.color.length){
+                           colorPicker.it = -1;
+                       }
+                        return colorPicker.color[colorPicker.it];
+                    }
+                };
+
+
+        function createField(){
+            ctx.beginPath();
+            ctx.fillStyle = 'red';
+            ctx.lineWidth = 10;
+            ctx.moveTo(350, 0);
+            ctx.lineTo(350, 400);
+            ctx.stroke();
+        }
+        function createBall (x, y, color, vx, vy){
+            ballArray.push(new Ball(x, y, color, vx, vy));
+        }
+        function Ball(x, y, color, vx, vy, radius){
+            this.x = x;
+            this.y = y;
+            this.vx = vx !== undefined ? vx : Math.random()*10;
+            this.vy = vy !== undefined ? vy : Math.random()*10;
+            this.color = color;
+            this.radius = radius !== undefined ? radius : 10;
+        }
+        Ball.prototype.getY = function (){
+            if (this.y + this.vy > canvas.height || this.y + this.vy < 0) {
+                this.vy = -this.vy;
+            }
+           return this.y += this.vy;
+        }
+        Ball.prototype.getX = function (){
+            if (this.x + this.vx > canvas.width/2-5 || this.x + this.vx < 0) {
+                this.vx = -this.vx;
+            }
+            return this.x += this.vx;
+        }
+        function getBallForCoordinate(x, y){
+            var count =0, length, ball, coordX, coordY;
+            for (length = ballArray.length; count < length; count += 1){
+                ball = ballArray[count];
+                coordX = x > ball.x ? x - ball.x : ball.x - x;
+                coordY = y > ball.y ? y - ball.y : ball.y - y;
+                if(Math.sqrt(coordX) + Math.sqrt(coordY) <= Math.sqrt(ball.radius+20)){
+                    return ball;
+                }
+
+            }
+        }
+        function save(){
+            var autoSave = JSON.stringify(ballArray)
+            sessionStorage.setItem('autoSave', autoSave);
+        }
+        function init(){
+            var count = 0, length, ballObject, eventTakeRelease, eventDrag,
+                autoSave = sessionStorage.getItem('autoSave');
+            canvas.width = 700;
+            canvas.height = 400;
+            if(autoSave){
+                autoSave = JSON.parse(autoSave);
+                for (length = autoSave.length; count< length; count +=1 ){
+                    ballObject = autoSave[count];
+                    createBall (ballObject.x, ballObject.y, ballObject.color, ballObject.vx, ballObject.vy);
+                }
+            } else{
+                createBall (550, 200, colorPicker.getColor(), 0, 0);
+            }
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|BB|PlayBook|IEMobile|Windows Phone|Kindle|Silk|Opera Mini/i.test(navigator.userAgent)) {
+                eventTakeRelease = 'touchstart';
+                eventDrag = 'touchmove';
+            } else {
+                eventTakeRelease = 'mousedown';
+                eventDrag = 'mousemove';
+            }
+            canvas.addEventListener(eventTakeRelease, takeReleaseBall);
+            canvas.addEventListener(eventDrag, dragBall);
+            window.requestAnimationFrame(draw);
+        }
+        function draw(){
+            var count =0, length, ball, x, y, collisionBall;
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            createField();
+            for (length = ballArray.length; count < length; count += 1){
+                ball = ballArray[count];
+                x = ball.getX();
+                y = ball.getY();
+                collisionBall = getBallForCoordinate(x, y);
+                if(collisionBall){
+                    collisionBall.vx = -collisionBall.vx;
+                    ball.vx = -ball.vx;
+                    collisionBall.vy = -collisionBall.vy;
+                    ball.vy = -ball.vy;
+                }
+                ctx.save();
+                ctx.beginPath();
+                ctx.fillStyle = ball.color;
+                ctx.arc(ball.getX(), ball.getY(),ball.radius,0,Math.PI*2,true);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+            save();
+            window.requestAnimationFrame(draw);
+        }
+        function getCoordinateForEvent (event){
+            return {
+                x:event.pageX - canvas.offsetLeft - 10,
+                y:event.pageY - canvas.offsetTop - 10
+            }
+        }
+        function takeReleaseBall (event){
+            var coordinates = getCoordinateForEvent (event),
+                    mouseX = coordinates.x,
+                    mouseY = coordinates.y;
+            if (mouseX > canvas.width/2-5){
+                moveBall = moveBall === undefined ? getBallForCoordinate(mouseX, mouseY): undefined;
+            }
+        }
+        function dragBall(event){
+            var coordinates = getCoordinateForEvent (event),
+                    mouseX = coordinates.x,
+                    mouseY = coordinates.y,
+                    vx,vy;
+            if (event.button !== 0 ||!moveBall){
+                return;
+            }
+            vx = mouseX - moveBall.x;
+            vy = mouseY - moveBall.y;
+            moveBall.x = mouseX;
+            moveBall.y = mouseY;
+            if (mouseX < canvas.width/2-5){
+                moveBall.vx = vx/6;
+                moveBall.vy = vy/6;
+                moveBall = undefined;
+                setTimeout(function (){
+                    createBall (550, 200, colorPicker.getColor(), 0, 0);
+                }, 500);
+            }
+        }
+
+        init();
+    })();
+</script>
+</html>
